@@ -1,0 +1,55 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Query compounds with formula MX2 (M = transition metal, X = S, Se, Te) using the Materials Project API.",
+                "Extract material_id, formula, spacegroup, energy_above_hull, band_gap, dos_at_fermi, and volume.",
+                "Extract the transition metal element from the formula and create a transition_metal column.",
+                "Handle missing values: drop rows where dos_at_fermi is missing; impute or flag missing values for other predictors.",
+                "Print a detailed summary of the dataset (counts, distributions, missing values) to the console.",
+                "Apply log1p transformation to energy_above_hull, one-hot encode spacegroup, and create the is_group_v binary feature.",
+                "Save the processed dataset to a CSV file."
+            ],
+            "sub_task": "Data Acquisition and Preprocessing",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Load the processed dataset.",
+                "Calculate VIF for all predictors; print the top 10 highest-VIF predictors and drop any with VIF > 10.",
+                "Implement a 5-fold cross-validated Ridge regression model to predict dos_at_fermi.",
+                "Print cross-validation R-squared scores, the mean R-squared, and the optimal Ridge alpha.",
+                "Compute Studentized residuals for all observations and save the results back to the dataset."
+            ],
+            "sub_task": "Statistical Modeling and Residual Calculation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Filter the dataset for metallic candidates (band_gap == 0.0).",
+                "Identify outliers where the Studentized residual > 2.0.",
+                "Print the full prioritized candidate table (all columns) and summary statistics (count, mean, max, min) of the residuals for the filtered set.",
+                "Save the final prioritized list of candidates."
+            ],
+            "sub_task": "Outlier Detection and Candidate Filtering",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Create a single figure with two subplots: a parity plot (Predicted vs. Actual dos_at_fermi) with a diagonal reference line and labels for the top 10 candidates, and a scatter plot of energy_above_hull (raw) vs. dos_at_fermi color-coded by Studentized residual.",
+                "Save the figure as a high-resolution PNG file."
+            ],
+            "sub_task": "Visualization of Results",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Structure the Results section into five subsections: (1) dataset composition and data quality, (2) multicollinearity assessment and model performance, (3) residual distribution and outlier identification, (4) the prioritized candidate list with physical rationale, and (5) interpretation of the visualization results.",
+                "Explicitly reference all quantitative outputs (R-squared, VIF, residual statistics) and the physical rationale for why specific transition metals (e.g., Nb, Ta) emerge as outliers.",
+                "Synthesize the final report, ensuring all plots and statistical findings are clearly interpreted."
+            ],
+            "sub_task": "Final Synthesis and Reporting",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
