@@ -1,0 +1,49 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Fetch MX2 compounds (M = Mo, W, Nb, Ta, Ti, Zr; X = S, Se, Te) via Materials Project API.",
+                "Parse lattice_parameters into individual numeric columns (a, b, c, alpha, beta, gamma).",
+                "Perform integrity audit: check for NaNs, duplicates (unique material_id), infinite values, and verify energy_above_hull >= 0 and band_gap >= 0.",
+                "Save the cleaned dataset to tmd_data.csv and print the file path, shape, and sample rows to the console."
+            ],
+            "sub_task": "Data acquisition, parsing, and integrity audit",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Compute descriptive statistics (mean, std, min, max, quartiles) for all numeric columns.",
+                "Calculate and print the full correlation matrix including lattice parameters.",
+                "Report counts of thermodynamically stable materials (energy_above_hull == 0) and metallic phases (band_gap == 0).",
+                "Compute skewness and kurtosis for dos_at_fermi and energy_above_hull, and provide recommendations on log-scaling for downstream modeling."
+            ],
+            "sub_task": "Statistical characterization and diagnostic analysis",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Generate a four-panel figure: Distribution of dos_at_fermi across top space groups, Scatter plot of energy_above_hull vs. band_gap, Box plots of dos_at_fermi by transition metal, Heatmap of mean dos_at_fermi (transition metal vs. top space groups).",
+                "Save as tmd_analysis_plots.png and print the list of included space groups, metals, and their respective counts to the console."
+            ],
+            "sub_task": "Multi-panel visualization",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Review the engineering outputs.",
+                "Formulate clarifying questions regarding: dos_at_fermi units (states/eV/unit-cell vs. states/eV/atom), API query scope (polymorphs vs. ground-state), and spacegroup definition (conventional vs. primitive)."
+            ],
+            "sub_task": "Questions report (report1)",
+            "sub_task_agent": "researcher"
+        },
+        {
+            "bullet_points": [
+                "Synthesize all findings into a final report.",
+                "Detail data quality diagnostics (missing rates, outliers, skewness).",
+                "Integrate heatmap insights to identify high-potential metal-symmetry combinations for superconductivity."
+            ],
+            "sub_task": "EDA findings report (report2)",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
