@@ -1,0 +1,59 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Query the Materials Project API for MX2 compounds (M = Mo, W, Nb, Ta, Ti, Zr; X = S, Se, Te).",
+                "Implement a fallback mechanism to generate a synthetic dataset mimicking realistic TMD properties if the API key is unavailable.",
+                "Handle missing values and duplicates; filter out unphysical data (e.g., negative band gaps).",
+                "Engineer features: log1p(energy_above_hull), c/a ratio, unit cell volume per atom, and atomic descriptors (valence electrons, electronegativity).",
+                "Print a detailed summary of the dataset (record counts, feature distributions, counts per metal/space group, and metallic vs. non-metallic phase counts).",
+                "Save the refined dataset as a CSV file."
+            ],
+            "sub_task": "Data Acquisition and Refinement",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "One-hot encode spacegroup and apply Z-score normalization to continuous features.",
+                "Train a Gradient Boosting Regressor using 5-fold cross-validation with a fixed random_state for reproducibility.",
+                "Print key model performance metrics (mean cross-validated R-squared, RMSE).",
+                "Train the final model on the full dataset and save the fitted model object to disk.",
+                "Calculate residuals (actual - predicted) for all samples and save them to the dataset."
+            ],
+            "sub_task": "Non-Linear Modeling and Residual Calculation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Import the fitted model and feature matrix saved in Step 2.",
+                "Compute SHAP values to identify drivers of dos_at_fermi.",
+                "Print the top-N most important features by mean absolute SHAP value with their numeric scores.",
+                "Generate and save a SHAP summary plot."
+            ],
+            "sub_task": "Interpretability Analysis via SHAP",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Filter for metallic phases (band_gap < 0.01 eV) and stability (energy_above_hull < 0.1 eV/atom).",
+                "Separate candidates into primary (theoretical == False) and secondary (theoretical == True) groups; print counts and top candidates for each.",
+                "Compute Pearson correlations between positive residuals and structural motifs (e.g., c/a ratio, volume per atom); print these correlations.",
+                "Re-classify candidates as \"structurally-driven\" vs. \"compositionally-driven\" based on residual-motif correlations.",
+                "Generate a scatter plot of energy_above_hull vs. dos_at_fermi, color-coded by residual magnitude.",
+                "Save the final prioritized list of candidates."
+            ],
+            "sub_task": "Candidate Filtering, Sensitivity Analysis, and Ranking",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Synthesize all numerical results (R-squared, RMSE, SHAP scores, residual correlations, candidate counts).",
+                "Discuss the physical significance of \"electronic overperformers\" by connecting their compositional identity (valence electron count, metal group) to BCS theory.",
+                "Evaluate the role of structural vs. compositional features in driving high DOS.",
+                "Write the final Results section of the research report, referencing all generated plots and statistics."
+            ],
+            "sub_task": "Results Synthesis and Reporting",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
