@@ -1,0 +1,666 @@
+
+###### PROMPT BEGINS ########
+Human: You are given four inputs:
+1) a dataset description,
+2) an idea or hypothesis,
+3) a research plan, and
+4) the results of the analysis.
+
+Your task is to produce a concise but information-dense summary that captures all scientifically relevant details needed to continue or extend this project. 
+
+This summary will be included in a living research report that will be updated as new experiments are performed. 
+Future agents will receive this report along with:
+
+- the same dataset description,
+- the same or a revised idea,
+- a new research plan,
+- and new experimental results.
+
+Therefore, your summary should:
+- Preserve all key assumptions, definitions, data characteristics, and methodological choices
+- Clearly state the main findings, limitations, and uncertainties
+- Highlight decisions that constrain or inform future experiments
+- Avoid unnecessary narrative, background, or stylistic elaboration
+
+**Aim for maximal information retention per word.**
+Write clearly and precisely, prioritizing content that a future agent would need in order to:
+
+- understand what was done,
+- know what worked or failed,
+- and decide what to do next.
+
+Data description:
+# Data Description: Transition-Metal Dichalcogenides (TMDs) and Superconductivity
+
+## Overview
+This project analyzes structural and electronic properties of Transition-Metal Dichalcogenides (TMDs) sourced from the Materials Project. The goal is to identify patterns between crystal symmetry (space groups) and indicators of superconducting potential (such as density of states at the Fermi level and structural stability).
+
+## Data Source
+- **API**: Materials Project API (MPRester)
+- **Target Materials**: Compounds with the formula MX2, where M = Transition Metal (e.g., Mo, W, Nb, Ta, Ti, Zr) and X = Chalcogen (S, Se, Te).
+
+## File Inventory (to be generated via API)
+The pipeline will generate the following files in the project directory:
+- `/home/node/work/projects/materials_project_v1/tmd_data.csv`: A dataset containing:
+    - `material_id`: Unique MP ID.
+    - `formula`: Chemical formula.
+    - `spacegroup`: Crystal space group.
+    - `energy_above_hull`: Stability indicator (eV/atom).
+    - `band_gap`: Electronic band gap (eV).
+    - `dos_at_fermi`: Density of states at the Fermi level.
+    - `volume`: Unit cell volume.
+    - `lattice_parameters`: a, b, c, alpha, beta, gamma.
+
+## Variable Meanings
+- `energy_above_hull`: A value of 0 indicates a thermodynamically stable material.
+- `dos_at_fermi`: High DOS at the Fermi level is often a prerequisite for superconductivity according to BCS theory.
+- `spacegroup`: Defines the symmetry operations of the crystal, critical for identifying phase transitions.
+
+## Suggested Analyses
+1. **Symmetry Mapping**: Compare the distribution of `dos_at_fermi` across different space groups.
+2. **Stability vs. Gap**: Analyze the relationship between thermodynamic stability and band gap to identify potential metallic phases.
+3. **Compositional Trends**: Check if specific transition metals consistently produce high DOS in specific symmetries.
+
+
+Idea: 
+**Title: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs**
+
+This research moves beyond simple DOS-thresholding by quantifying the "Electronic Overperformance" of transition metals within the MX2 structural landscape. We will execute a multivariate linear regression where `dos_at_fermi` is the dependent variable, modeled as a function of `volume`, `spacegroup` (via one-hot encoding), and `log1p(energy_above_hull)`. By calculating the positive residuals of this model, we isolate materials where the transition metal's electronic contribution significantly exceeds the expectations set by their structural geometry and thermodynamic stability. This approach identifies "electronic outliers"—materials that achieve high DOS not merely due to favorable symmetry or volume, but through intrinsic compositional properties that may foster enhanced electron-phonon coupling. By ranking candidates by these regression residuals, we provide a prioritized list of metallic candidates (`band_gap` = 0.0 eV) that possess the highest potential for superconductivity while remaining agnostic to the bias of structural prevalence. This methodology effectively decouples compositional excellence from structural geometry, offering a refined, physically grounded path for experimental target identification.
+
+Research plan:
+1. **Data Preprocessing and Feature Engineering**: 
+   - Apply a `log1p` transformation to the `energy_above_hull` feature to mitigate right-skewness.
+   - Perform one-hot encoding on the `spacegroup` categorical variable.
+   - Create a binary feature `is_group_v` (1 if the transition metal is Nb or Ta, 0 otherwise) to explicitly account for known compositional drivers of high DOS.
+   - Apply Z-score normalization (StandardScaler) to all continuous features (`volume`, transformed `energy_above_hull`, and `dos_at_fermi`).
+
+2. **Multicollinearity and Model Selection**:
+   - Calculate the Variance Inflation Factor (VIF) for all predictors (`volume`, `spacegroup` dummies, `energy_above_hull`, `is_group_v`) to ensure no severe multicollinearity exists.
+   - Select a regularized regression model (Ridge or Lasso) to stabilize coefficients, ensuring the model remains robust even if minor correlations persist between structural features.
+
+3. **Cross-Validated Residual Calculation**:
+   - Implement a 5-fold cross-validation strategy to fit the regression model.
+   - For each fold, calculate the residuals (actual `dos_at_fermi` minus predicted `dos_at_fermi`) for the held-out test set. This ensures that the "expected" DOS is derived from a model that has not seen the specific data point, preventing overfitting.
+
+4. **Residual Normalization and Statistical Outlier Detection**:
+   - Compute the Studentized residuals for all observations to account for potential heteroscedasticity.
+   - Identify "statistically significant" electronic outliers by selecting materials where the Studentized residual exceeds a threshold (e.g., > 2.0 standard deviations).
+
+5. **Filtering for Metallic Candidates**:
+   - Filter the dataset to retain only materials where `band_gap == 0.0` eV.
+   - Cross-reference these metallic candidates with the calculated Studentized residuals to isolate materials that are both metallic and exhibit statistically significant "Electronic Overperformance."
+
+6. **Ranking and Prioritization**:
+   - Rank the filtered metallic candidates in descending order based on the magnitude of their Studentized residuals.
+   - Generate a final prioritized list of candidates that demonstrate the highest potential for enhanced electron-phonon coupling, effectively decoupling compositional excellence from structural geometry.
+
+7. **Visualization of Results**:
+   - Generate a parity plot comparing predicted vs. actual `dos_at_fermi`, explicitly highlighting the top 10 ranked candidates with distinct labels or colors.
+   - Create a scatter plot of `energy_above_hull` vs. `dos_at_fermi`, color-coded by the magnitude of the Studentized residuals, to visualize the decoupling of structural stability from electronic performance.
+
+8. **Final Synthesis**:
+   - Compile the final prioritized list including `material_id`, `formula`, `spacegroup`, and Studentized residual value.
+   - Document the findings by summarizing how the identified outliers deviate from the baseline trends established by the structural and compositional features, providing a physically grounded rationale for experimental validation.
+
+Analysis results:
+# Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs
+
+### 1. Dataset Composition and Data Quality
+
+The foundation of this research relies on a comprehensive dataset comprising 500 Transition-Metal Dichalcogenide (TMD) compounds with the general stoichiometric formula MX2. The dataset encompasses a diverse array of transition metals (M) paired with chalcogens (X = S, Se, Te). The structural diversity of the dataset is captured through the distribution of crystallographic space groups, which define the symmetry operations of the crystal lattices. The dataset includes five primary space groups: P-3m1 (117 samples), Pm-3m (101 samples), R3m (94 samples), Fm-3m (94 samples), and P6_3/mmc (94 samples). This relatively balanced distribution ensures that the subsequent statistical models are not unduly biased toward a single structural conformation, allowing for a generalized analysis of the MX2 landscape.
+
+The continuous features in the dataset provide a macroscopic view of the thermodynamic and electronic properties of these materials. The `energy_above_hull`, a critical indicator of thermodynamic stability, exhibits a mean of 0.096 eV/atom and a standard deviation of 0.095 eV/atom, with values ranging from a highly stable 0.0001 eV/atom to a metastable 0.480 eV/atom. To mitigate the inherent right-skewness of this thermodynamic metric and linearize its relationship with the target variables, a `log1p` transformation was applied. The electronic `band_gap` spans from 0.0 eV (indicative of metallic behavior) to 2.96 eV, with a mean of 0.786 eV. The primary target variable, the density of states at the Fermi level (`dos_at_fermi`), displays significant variance, with a mean of 2.449 states/eV and a maximum of 9.94 states/eV. Finally, the unit cell `volume` averages 50.69 Å³, ranging from 15.29 to 84.96 Å³.
+
+Data quality was rigorously maintained throughout the preprocessing phase. The dataset contained zero missing values across all critical columns, ensuring that no imputation artifacts were introduced into the target variable or primary predictors. To explicitly account for known compositional drivers of high DOS, a binary feature, `is_group_v`, was engineered to flag compounds containing Niobium (Nb) or Tantalum (Ta). Finally, all continuous predictors (`volume`, `energy_above_hull_log1p`, and `dos_at_fermi`) were standardized using Z-score normalization. This scaling is imperative for regularized regression techniques, ensuring that features with disparate magnitudes do not disproportionately influence the penalty term during model training.
+
+### 2. Multicollinearity Assessment and Model Performance
+
+Prior to model fitting, a rigorous multicollinearity assessment was conducted using the Variance Inflation Factor (VIF). Multicollinearity can severely destabilize the coefficients of a linear regression model, rendering the interpretation of residuals unreliable. The initial VIF calculation revealed infinite values for the one-hot encoded space group variables (`sg_Fm-3m`, `sg_Pm-3m`, `sg_P6_3/mmc`, `sg_P-3m1`, `sg_R3m`). This is a classic manifestation of the "dummy variable trap," where the sum of the mutually exclusive categorical indicators perfectly predicts the intercept, leading to a singular design matrix. To resolve this perfect collinearity, the `sg_Fm-3m` feature was dropped, serving as the baseline reference state for the model. Following this adjustment, the remaining predictors exhibited VIF values well below the conservative threshold of 10. Specifically, `energy_above_hull_log1p` yielded a VIF of 1.016, `volume` a VIF of 1.009, and `is_group_v` a VIF of 1.007. This confirmed that the refined feature space was free of pathological collinearity, allowing for stable coefficient estimation.
+
+With a stable feature space established, a Ridge regression model (L2 regularization) was deployed to predict the scaled `dos_at_fermi`. Ridge regression was selected to further guard against any latent residual collinearity and to prevent overfitting. The model was trained using a 5-fold cross-validation strategy, optimizing the regularization parameter (α) over a logarithmic grid. The cross-validation procedure identified an optimal α of 1000.0. 
+
+The performance metrics of the cross-validated model are highly revealing. The R-squared scores across the five folds were consistently negative or near zero: [-0.0218, -0.0065, -0.0114, -0.0408, -0.1407], culminating in a mean cross-validation R-squared of -0.0442. In a conventional predictive modeling context, an R-squared below zero indicates that the model performs worse than a simple horizontal line representing the mean of the target variable. However, within the specific methodological framework of this research, this "poor" performance is both expected and highly informative. It quantitatively demonstrates that the macroscopic structural features (volume, space group symmetry) and thermodynamic stability (`energy_above_hull`) are fundamentally insufficient to explain the variance in the density of states at the Fermi level. The electronic structure of these TMDs is not merely a byproduct of their geometric arrangement or stability; rather, it is driven by intrinsic, localized compositional factors. Because the baseline structural model fails to capture this variance, the resulting residuals effectively isolate the purely compositional contributions to the DOS, setting the stage for robust outlier detection.
+
+### 3. Residual Distribution and Outlier Identification
+
+To quantify the "Electronic Overperformance" of the materials, we analyzed the residuals from the cross-validated Ridge regression. To account for potential heteroscedasticity and the varying leverage of different data points in the feature space, the raw residuals were converted into Studentized residuals. The Studentized residuals for the entire dataset exhibited a mean of -0.00077 and a standard deviation of 1.001, perfectly aligning with the expected standard normal distribution properties. The residuals spanned from a minimum of -0.849 to a maximum of 2.338.
+
+Because superconductivity in the Bardeen-Cooper-Schrieffer (BCS) regime requires a metallic ground state, the dataset was subsequently filtered to retain only materials with a `band_gap` of 0.0 eV. This filtering isolated 246 metallic candidates. Within this metallic subset, the distribution of Studentized residuals shifted significantly upward, exhibiting a mean of 0.794. This positive shift indicates that metallic TMDs, on average, possess a higher DOS at the Fermi level than the global structural baseline would predict.
+
+To identify the true "electronic outliers"—materials that exhibit statistically significant electronic overperformance—we applied a stringent threshold, selecting only those metallic candidates with a Studentized residual greater than 2.0 standard deviations. This threshold isolates the upper tail of the distribution, ensuring that the selected materials are not merely marginally better than average, but represent distinct anomalies in the structural-electronic landscape. This filtering process yielded a highly refined list of 31 prioritized candidates. The residuals within this elite cohort ranged from 2.006 to 2.338, with a mean of 2.202. By isolating these specific materials, we successfully decoupled compositional excellence from structural geometry, providing a mathematically rigorous and physically grounded set of targets for experimental validation.
+
+### 4. The Prioritized Candidate List with Physical Rationale
+
+The culmination of the residual-based filtering is a prioritized list of 31 metallic TMDs, ranked by the magnitude of their Studentized residuals. The top 10 candidates from this list represent the most extreme cases of electronic overperformance: MnS2 (residual: 2.338), VS2 (2.334), AgS2 (2.329), IrTe2 (2.318), LuSe2 (2.314), CuS2 (2.309), MoSe2 (2.305), TaTe2 (2.302), ReSe2 (2.300), and FeS2 (2.287). 
+
+The physical rationale behind the emergence of these specific compounds is deeply rooted in their electronic band structures and orbital hybridizations. According to BCS theory, the superconducting transition temperature (Tc) is exponentially dependent on the density of states at the Fermi level (N(EF)) and the strength of the electron-phonon coupling potential. Therefore, maximizing N(EF) is a primary strategy for discovering new superconductors. However, simply screening for high DOS can yield false positives—materials where the high DOS is a fragile artifact of a specific, easily distorted crystal lattice. By isolating materials with high Studentized residuals, we identify compounds where the high N(EF) is driven by the intrinsic nature of the M-X bonds.
+
+The presence of TaTe2 (Tantalum Ditelluride) in the top echelon is particularly validating for our methodology. Group V transition metals, such as Tantalum (Ta) and Niobium (Nb), possess a d¹ electron configuration in the MX2 stoichiometry. This configuration typically results in a half-filled d-band that crosses the Fermi level, leading to an inherently high density of states. This high DOS is a well-documented prerequisite for strong electron-phonon coupling, making Group V TMDs classic candidates for charge density wave (CDW) phases and superconductivity. The inclusion of the `is_group_v` feature in our model was a deliberate choice to see if the regression would absorb the variance associated with Nb and Ta. The fact that TaTe2 still emerged as an outlier (residual: 2.302) despite the model having access to the `is_group_v` predictor indicates that TaTe2's electronic overperformance is exceptional even relative to other Group V materials.
+
+Furthermore, the appearance of compounds like VS2 (Vanadium Disulfide) and MoSe2 (Molybdenum Diselenide) highlights the nuanced interplay between transition metal d-orbitals and chalcogen p-orbitals. Vanadium exhibits strong electronic correlations that can lead to enhanced DOS at the Fermi level, often competing with magnetic ground states. Molybdenum typically forms semiconducting phases; however, in specific polymorphic forms or under certain thermodynamic conditions, it can exhibit metallic behavior with a sharply peaked DOS due to the specific splitting of the d-orbitals in the crystal field. 
+
+The inclusion of late transition metals like AgS2, CuS2, and IrTe2 suggests that strong covalent mixing between the extended d-orbitals of the heavy metals and the chalcogen p-orbitals can also result in anomalous electronic accumulation at the Fermi level. IrTe2, for instance, is known experimentally to undergo complex structural and electronic phase transitions, often hosting superconducting states upon doping or intercalation. By ranking these candidates based on their deviation from structural expectations, we provide a prioritized roadmap for experimentalists. These materials achieve their high DOS not because they happen to crystallize in a favorable volume or symmetry, but because their intrinsic elemental composition drives an anomalous electronic response, maximizing the potential for the formation of Cooper pairs.
+
+### 5. Interpretation of the Visualization Results
+
+The quantitative findings are powerfully corroborated by the visual analysis of the model's outputs, which are encapsulated in a dual-panel figure. 
+
+The first visualization, a Parity Plot comparing the predicted DOS at the Fermi level against the actual DOS, starkly illustrates the limitations of the structural baseline model and the magnitude of the outliers. In this plot, the bulk of the predictions are tightly clustered near zero on the x-axis (Predicted DOS), while the actual DOS values (y-axis) exhibit a massive spread, ranging from -0.7684 to 2.3512 (scaled). The diagonal reference line (y = x), which represents perfect prediction, is largely unpopulated. The top 10 prioritized candidates are explicitly highlighted in red and annotated with their chemical formulas. These points are located far above the parity line, visually confirming that their actual DOS vastly exceeds the model's predictions. For example, MnS2 has a predicted scaled DOS of -0.0249 but an actual scaled DOS of 2.3297. The vertical distance from the parity line to these red points represents the Studentized residual—the core metric of our study. This plot visually cements the conclusion that structural and thermodynamic features are blind to the compositional mechanisms driving high DOS, and that our top candidates are true electronic anomalies.
+
+The second visualization is a scatter plot mapping the raw `energy_above_hull` (x-axis, ranging from 0.0001 to 0.4797 eV/atom) against the scaled `dos_at_fermi` (y-axis), with the data points color-coded by their Studentized residual (ranging from -0.8493 to 2.3384). This plot is crucial for understanding the relationship between thermodynamic stability and electronic overperformance. In conventional materials discovery, there is often a strict bias toward highly stable materials (energy above hull ≈ 0). However, the scatter plot reveals that high DOS values, and correspondingly high Studentized residuals (indicated by the bright yellow/green hues), are distributed across the entire spectrum of thermodynamic stability. 
+
+For instance, while some top candidates like TaTe2 (0.0012 eV/atom) and CuS2 (0.0060 eV/atom) are highly stable and reside on or very near the convex hull, others like FeS2 (0.4396 eV/atom) and IrTe2 (0.2007 eV/atom) exist in highly metastable regimes. The color gradient clearly shows that the "electronic overperformance" is decoupled from the `energy_above_hull`. This is a profound finding: it suggests that the search for superconducting TMDs should not be strictly confined to the thermodynamic convex hull. Metastable phases, which might be accessible via non-equilibrium synthesis techniques such as molecular beam epitaxy, rapid quenching, or high-pressure synthesis, can harbor exceptional electronic properties that are entirely missed by traditional stability-first screening approaches. The residual-based methodology, as visualized here, successfully navigates this complex landscape, identifying the most promising electronic candidates regardless of their position on the thermodynamic stability curve.
+
+**Respond in exactly this format:**
+
+\\begin{REPORT}
+<REPORT>
+\\end{REPORT}
+
+In <REPORT>, put your report.
+
+###### PROMPT ENDS ########
+
+
+###### PROMPT BEGINS ########
+Human: You are provided with the following inputs:
+
+1) A description of a dataset
+2) A current scientific idea or hypothesis
+3) A current research plan
+4) The results obtained from executing that plan
+
+**Your task is to assess whether any limitations, failures, or ambiguities in the analysis are directly attributable to constraints described in the dataset description.**
+
+Examples of such constraints include (but are not limited to):
+- required preprocessing steps or exclusions,
+- missing variables or incomplete coverage,
+- limited sample size or class imbalance,
+- measurement noise, censoring, or aggregation,
+- assumptions imposed by how the data were collected or curated.
+
+**Scope restriction (important)**:
+- Focus only on the dataset description.
+- Do not critique the scientific idea, hypothesis, or research plan.
+- Do not suggest alternative methods or models.
+- Other agents are responsible for methodological or conceptual feedback.
+
+**If a data-level constraint plausibly explains observed failures or weak results, describe:**
+- which constraint is responsible,
+- how it limits the analysis,
+- and what type of conclusions are affected.
+
+If no such constraints are evident, explicitly state that the dataset description does not appear to explain the observed issues.
+
+Data description:
+# Data Description: Transition-Metal Dichalcogenides (TMDs) and Superconductivity
+
+## Overview
+This project analyzes structural and electronic properties of Transition-Metal Dichalcogenides (TMDs) sourced from the Materials Project. The goal is to identify patterns between crystal symmetry (space groups) and indicators of superconducting potential (such as density of states at the Fermi level and structural stability).
+
+## Data Source
+- **API**: Materials Project API (MPRester)
+- **Target Materials**: Compounds with the formula MX2, where M = Transition Metal (e.g., Mo, W, Nb, Ta, Ti, Zr) and X = Chalcogen (S, Se, Te).
+
+## File Inventory (to be generated via API)
+The pipeline will generate the following files in the project directory:
+- `/home/node/work/projects/materials_project_v1/tmd_data.csv`: A dataset containing:
+    - `material_id`: Unique MP ID.
+    - `formula`: Chemical formula.
+    - `spacegroup`: Crystal space group.
+    - `energy_above_hull`: Stability indicator (eV/atom).
+    - `band_gap`: Electronic band gap (eV).
+    - `dos_at_fermi`: Density of states at the Fermi level.
+    - `volume`: Unit cell volume.
+    - `lattice_parameters`: a, b, c, alpha, beta, gamma.
+
+## Variable Meanings
+- `energy_above_hull`: A value of 0 indicates a thermodynamically stable material.
+- `dos_at_fermi`: High DOS at the Fermi level is often a prerequisite for superconductivity according to BCS theory.
+- `spacegroup`: Defines the symmetry operations of the crystal, critical for identifying phase transitions.
+
+## Suggested Analyses
+1. **Symmetry Mapping**: Compare the distribution of `dos_at_fermi` across different space groups.
+2. **Stability vs. Gap**: Analyze the relationship between thermodynamic stability and band gap to identify potential metallic phases.
+3. **Compositional Trends**: Check if specific transition metals consistently produce high DOS in specific symmetries.
+
+
+Idea: 
+**Title: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs**
+
+This research moves beyond simple DOS-thresholding by quantifying the "Electronic Overperformance" of transition metals within the MX2 structural landscape. We will execute a multivariate linear regression where `dos_at_fermi` is the dependent variable, modeled as a function of `volume`, `spacegroup` (via one-hot encoding), and `log1p(energy_above_hull)`. By calculating the positive residuals of this model, we isolate materials where the transition metal's electronic contribution significantly exceeds the expectations set by their structural geometry and thermodynamic stability. This approach identifies "electronic outliers"—materials that achieve high DOS not merely due to favorable symmetry or volume, but through intrinsic compositional properties that may foster enhanced electron-phonon coupling. By ranking candidates by these regression residuals, we provide a prioritized list of metallic candidates (`band_gap` = 0.0 eV) that possess the highest potential for superconductivity while remaining agnostic to the bias of structural prevalence. This methodology effectively decouples compositional excellence from structural geometry, offering a refined, physically grounded path for experimental target identification.
+
+Research plan:
+1. **Data Preprocessing and Feature Engineering**: 
+   - Apply a `log1p` transformation to the `energy_above_hull` feature to mitigate right-skewness.
+   - Perform one-hot encoding on the `spacegroup` categorical variable.
+   - Create a binary feature `is_group_v` (1 if the transition metal is Nb or Ta, 0 otherwise) to explicitly account for known compositional drivers of high DOS.
+   - Apply Z-score normalization (StandardScaler) to all continuous features (`volume`, transformed `energy_above_hull`, and `dos_at_fermi`).
+
+2. **Multicollinearity and Model Selection**:
+   - Calculate the Variance Inflation Factor (VIF) for all predictors (`volume`, `spacegroup` dummies, `energy_above_hull`, `is_group_v`) to ensure no severe multicollinearity exists.
+   - Select a regularized regression model (Ridge or Lasso) to stabilize coefficients, ensuring the model remains robust even if minor correlations persist between structural features.
+
+3. **Cross-Validated Residual Calculation**:
+   - Implement a 5-fold cross-validation strategy to fit the regression model.
+   - For each fold, calculate the residuals (actual `dos_at_fermi` minus predicted `dos_at_fermi`) for the held-out test set. This ensures that the "expected" DOS is derived from a model that has not seen the specific data point, preventing overfitting.
+
+4. **Residual Normalization and Statistical Outlier Detection**:
+   - Compute the Studentized residuals for all observations to account for potential heteroscedasticity.
+   - Identify "statistically significant" electronic outliers by selecting materials where the Studentized residual exceeds a threshold (e.g., > 2.0 standard deviations).
+
+5. **Filtering for Metallic Candidates**:
+   - Filter the dataset to retain only materials where `band_gap == 0.0` eV.
+   - Cross-reference these metallic candidates with the calculated Studentized residuals to isolate materials that are both metallic and exhibit statistically significant "Electronic Overperformance."
+
+6. **Ranking and Prioritization**:
+   - Rank the filtered metallic candidates in descending order based on the magnitude of their Studentized residuals.
+   - Generate a final prioritized list of candidates that demonstrate the highest potential for enhanced electron-phonon coupling, effectively decoupling compositional excellence from structural geometry.
+
+7. **Visualization of Results**:
+   - Generate a parity plot comparing predicted vs. actual `dos_at_fermi`, explicitly highlighting the top 10 ranked candidates with distinct labels or colors.
+   - Create a scatter plot of `energy_above_hull` vs. `dos_at_fermi`, color-coded by the magnitude of the Studentized residuals, to visualize the decoupling of structural stability from electronic performance.
+
+8. **Final Synthesis**:
+   - Compile the final prioritized list including `material_id`, `formula`, `spacegroup`, and Studentized residual value.
+   - Document the findings by summarizing how the identified outliers deviate from the baseline trends established by the structural and compositional features, providing a physically grounded rationale for experimental validation.
+
+Analysis results:
+# Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs
+
+### 1. Dataset Composition and Data Quality
+
+The foundation of this research relies on a comprehensive dataset comprising 500 Transition-Metal Dichalcogenide (TMD) compounds with the general stoichiometric formula MX2. The dataset encompasses a diverse array of transition metals (M) paired with chalcogens (X = S, Se, Te). The structural diversity of the dataset is captured through the distribution of crystallographic space groups, which define the symmetry operations of the crystal lattices. The dataset includes five primary space groups: P-3m1 (117 samples), Pm-3m (101 samples), R3m (94 samples), Fm-3m (94 samples), and P6_3/mmc (94 samples). This relatively balanced distribution ensures that the subsequent statistical models are not unduly biased toward a single structural conformation, allowing for a generalized analysis of the MX2 landscape.
+
+The continuous features in the dataset provide a macroscopic view of the thermodynamic and electronic properties of these materials. The `energy_above_hull`, a critical indicator of thermodynamic stability, exhibits a mean of 0.096 eV/atom and a standard deviation of 0.095 eV/atom, with values ranging from a highly stable 0.0001 eV/atom to a metastable 0.480 eV/atom. To mitigate the inherent right-skewness of this thermodynamic metric and linearize its relationship with the target variables, a `log1p` transformation was applied. The electronic `band_gap` spans from 0.0 eV (indicative of metallic behavior) to 2.96 eV, with a mean of 0.786 eV. The primary target variable, the density of states at the Fermi level (`dos_at_fermi`), displays significant variance, with a mean of 2.449 states/eV and a maximum of 9.94 states/eV. Finally, the unit cell `volume` averages 50.69 Å³, ranging from 15.29 to 84.96 Å³.
+
+Data quality was rigorously maintained throughout the preprocessing phase. The dataset contained zero missing values across all critical columns, ensuring that no imputation artifacts were introduced into the target variable or primary predictors. To explicitly account for known compositional drivers of high DOS, a binary feature, `is_group_v`, was engineered to flag compounds containing Niobium (Nb) or Tantalum (Ta). Finally, all continuous predictors (`volume`, `energy_above_hull_log1p`, and `dos_at_fermi`) were standardized using Z-score normalization. This scaling is imperative for regularized regression techniques, ensuring that features with disparate magnitudes do not disproportionately influence the penalty term during model training.
+
+### 2. Multicollinearity Assessment and Model Performance
+
+Prior to model fitting, a rigorous multicollinearity assessment was conducted using the Variance Inflation Factor (VIF). Multicollinearity can severely destabilize the coefficients of a linear regression model, rendering the interpretation of residuals unreliable. The initial VIF calculation revealed infinite values for the one-hot encoded space group variables (`sg_Fm-3m`, `sg_Pm-3m`, `sg_P6_3/mmc`, `sg_P-3m1`, `sg_R3m`). This is a classic manifestation of the "dummy variable trap," where the sum of the mutually exclusive categorical indicators perfectly predicts the intercept, leading to a singular design matrix. To resolve this perfect collinearity, the `sg_Fm-3m` feature was dropped, serving as the baseline reference state for the model. Following this adjustment, the remaining predictors exhibited VIF values well below the conservative threshold of 10. Specifically, `energy_above_hull_log1p` yielded a VIF of 1.016, `volume` a VIF of 1.009, and `is_group_v` a VIF of 1.007. This confirmed that the refined feature space was free of pathological collinearity, allowing for stable coefficient estimation.
+
+With a stable feature space established, a Ridge regression model (L2 regularization) was deployed to predict the scaled `dos_at_fermi`. Ridge regression was selected to further guard against any latent residual collinearity and to prevent overfitting. The model was trained using a 5-fold cross-validation strategy, optimizing the regularization parameter (α) over a logarithmic grid. The cross-validation procedure identified an optimal α of 1000.0. 
+
+The performance metrics of the cross-validated model are highly revealing. The R-squared scores across the five folds were consistently negative or near zero: [-0.0218, -0.0065, -0.0114, -0.0408, -0.1407], culminating in a mean cross-validation R-squared of -0.0442. In a conventional predictive modeling context, an R-squared below zero indicates that the model performs worse than a simple horizontal line representing the mean of the target variable. However, within the specific methodological framework of this research, this "poor" performance is both expected and highly informative. It quantitatively demonstrates that the macroscopic structural features (volume, space group symmetry) and thermodynamic stability (`energy_above_hull`) are fundamentally insufficient to explain the variance in the density of states at the Fermi level. The electronic structure of these TMDs is not merely a byproduct of their geometric arrangement or stability; rather, it is driven by intrinsic, localized compositional factors. Because the baseline structural model fails to capture this variance, the resulting residuals effectively isolate the purely compositional contributions to the DOS, setting the stage for robust outlier detection.
+
+### 3. Residual Distribution and Outlier Identification
+
+To quantify the "Electronic Overperformance" of the materials, we analyzed the residuals from the cross-validated Ridge regression. To account for potential heteroscedasticity and the varying leverage of different data points in the feature space, the raw residuals were converted into Studentized residuals. The Studentized residuals for the entire dataset exhibited a mean of -0.00077 and a standard deviation of 1.001, perfectly aligning with the expected standard normal distribution properties. The residuals spanned from a minimum of -0.849 to a maximum of 2.338.
+
+Because superconductivity in the Bardeen-Cooper-Schrieffer (BCS) regime requires a metallic ground state, the dataset was subsequently filtered to retain only materials with a `band_gap` of 0.0 eV. This filtering isolated 246 metallic candidates. Within this metallic subset, the distribution of Studentized residuals shifted significantly upward, exhibiting a mean of 0.794. This positive shift indicates that metallic TMDs, on average, possess a higher DOS at the Fermi level than the global structural baseline would predict.
+
+To identify the true "electronic outliers"—materials that exhibit statistically significant electronic overperformance—we applied a stringent threshold, selecting only those metallic candidates with a Studentized residual greater than 2.0 standard deviations. This threshold isolates the upper tail of the distribution, ensuring that the selected materials are not merely marginally better than average, but represent distinct anomalies in the structural-electronic landscape. This filtering process yielded a highly refined list of 31 prioritized candidates. The residuals within this elite cohort ranged from 2.006 to 2.338, with a mean of 2.202. By isolating these specific materials, we successfully decoupled compositional excellence from structural geometry, providing a mathematically rigorous and physically grounded set of targets for experimental validation.
+
+### 4. The Prioritized Candidate List with Physical Rationale
+
+The culmination of the residual-based filtering is a prioritized list of 31 metallic TMDs, ranked by the magnitude of their Studentized residuals. The top 10 candidates from this list represent the most extreme cases of electronic overperformance: MnS2 (residual: 2.338), VS2 (2.334), AgS2 (2.329), IrTe2 (2.318), LuSe2 (2.314), CuS2 (2.309), MoSe2 (2.305), TaTe2 (2.302), ReSe2 (2.300), and FeS2 (2.287). 
+
+The physical rationale behind the emergence of these specific compounds is deeply rooted in their electronic band structures and orbital hybridizations. According to BCS theory, the superconducting transition temperature (Tc) is exponentially dependent on the density of states at the Fermi level (N(EF)) and the strength of the electron-phonon coupling potential. Therefore, maximizing N(EF) is a primary strategy for discovering new superconductors. However, simply screening for high DOS can yield false positives—materials where the high DOS is a fragile artifact of a specific, easily distorted crystal lattice. By isolating materials with high Studentized residuals, we identify compounds where the high N(EF) is driven by the intrinsic nature of the M-X bonds.
+
+The presence of TaTe2 (Tantalum Ditelluride) in the top echelon is particularly validating for our methodology. Group V transition metals, such as Tantalum (Ta) and Niobium (Nb), possess a d¹ electron configuration in the MX2 stoichiometry. This configuration typically results in a half-filled d-band that crosses the Fermi level, leading to an inherently high density of states. This high DOS is a well-documented prerequisite for strong electron-phonon coupling, making Group V TMDs classic candidates for charge density wave (CDW) phases and superconductivity. The inclusion of the `is_group_v` feature in our model was a deliberate choice to see if the regression would absorb the variance associated with Nb and Ta. The fact that TaTe2 still emerged as an outlier (residual: 2.302) despite the model having access to the `is_group_v` predictor indicates that TaTe2's electronic overperformance is exceptional even relative to other Group V materials.
+
+Furthermore, the appearance of compounds like VS2 (Vanadium Disulfide) and MoSe2 (Molybdenum Diselenide) highlights the nuanced interplay between transition metal d-orbitals and chalcogen p-orbitals. Vanadium exhibits strong electronic correlations that can lead to enhanced DOS at the Fermi level, often competing with magnetic ground states. Molybdenum typically forms semiconducting phases; however, in specific polymorphic forms or under certain thermodynamic conditions, it can exhibit metallic behavior with a sharply peaked DOS due to the specific splitting of the d-orbitals in the crystal field. 
+
+The inclusion of late transition metals like AgS2, CuS2, and IrTe2 suggests that strong covalent mixing between the extended d-orbitals of the heavy metals and the chalcogen p-orbitals can also result in anomalous electronic accumulation at the Fermi level. IrTe2, for instance, is known experimentally to undergo complex structural and electronic phase transitions, often hosting superconducting states upon doping or intercalation. By ranking these candidates based on their deviation from structural expectations, we provide a prioritized roadmap for experimentalists. These materials achieve their high DOS not because they happen to crystallize in a favorable volume or symmetry, but because their intrinsic elemental composition drives an anomalous electronic response, maximizing the potential for the formation of Cooper pairs.
+
+### 5. Interpretation of the Visualization Results
+
+The quantitative findings are powerfully corroborated by the visual analysis of the model's outputs, which are encapsulated in a dual-panel figure. 
+
+The first visualization, a Parity Plot comparing the predicted DOS at the Fermi level against the actual DOS, starkly illustrates the limitations of the structural baseline model and the magnitude of the outliers. In this plot, the bulk of the predictions are tightly clustered near zero on the x-axis (Predicted DOS), while the actual DOS values (y-axis) exhibit a massive spread, ranging from -0.7684 to 2.3512 (scaled). The diagonal reference line (y = x), which represents perfect prediction, is largely unpopulated. The top 10 prioritized candidates are explicitly highlighted in red and annotated with their chemical formulas. These points are located far above the parity line, visually confirming that their actual DOS vastly exceeds the model's predictions. For example, MnS2 has a predicted scaled DOS of -0.0249 but an actual scaled DOS of 2.3297. The vertical distance from the parity line to these red points represents the Studentized residual—the core metric of our study. This plot visually cements the conclusion that structural and thermodynamic features are blind to the compositional mechanisms driving high DOS, and that our top candidates are true electronic anomalies.
+
+The second visualization is a scatter plot mapping the raw `energy_above_hull` (x-axis, ranging from 0.0001 to 0.4797 eV/atom) against the scaled `dos_at_fermi` (y-axis), with the data points color-coded by their Studentized residual (ranging from -0.8493 to 2.3384). This plot is crucial for understanding the relationship between thermodynamic stability and electronic overperformance. In conventional materials discovery, there is often a strict bias toward highly stable materials (energy above hull ≈ 0). However, the scatter plot reveals that high DOS values, and correspondingly high Studentized residuals (indicated by the bright yellow/green hues), are distributed across the entire spectrum of thermodynamic stability. 
+
+For instance, while some top candidates like TaTe2 (0.0012 eV/atom) and CuS2 (0.0060 eV/atom) are highly stable and reside on or very near the convex hull, others like FeS2 (0.4396 eV/atom) and IrTe2 (0.2007 eV/atom) exist in highly metastable regimes. The color gradient clearly shows that the "electronic overperformance" is decoupled from the `energy_above_hull`. This is a profound finding: it suggests that the search for superconducting TMDs should not be strictly confined to the thermodynamic convex hull. Metastable phases, which might be accessible via non-equilibrium synthesis techniques such as molecular beam epitaxy, rapid quenching, or high-pressure synthesis, can harbor exceptional electronic properties that are entirely missed by traditional stability-first screening approaches. The residual-based methodology, as visualized here, successfully navigates this complex landscape, identifying the most promising electronic candidates regardless of their position on the thermodynamic stability curve.
+
+**Respond in exactly this format:**
+
+\\begin{COMMENTS}
+<COMMENTS>
+\\end{COMMENTS}
+
+In <COMMENTS>, put your comments. Your comments should be short, unless you identify issues with the input data description.
+
+###### PROMPT ENDS ########
+
+
+###### PROMPT BEGINS ########
+Human: You are provided with the following inputs:
+
+1) A description of a dataset
+2) A current scientific idea or hypothesis
+3) A current research plan
+4) The results obtained from executing that plan
+5) A cumulative report documenting all previous analyses performed on the same dataset
+
+Your task is to critically evaluate the current analysis in the context of all prior work.
+The goal is not to summarize, but to provide actionable, technically informed feedback that will improve the scientific quality, robustness, and insight of future iterations.
+
+Assume that:
+- The dataset is fixed
+- Prior analyses are known and accessible
+- Future agents will use your feedback to design the next research iteration
+
+**Evaluation Guidelines (must follow)**
+**Be a hard critic.**
+    - Identify weaknesses, gaps, overclaims, and missed opportunities.
+    - Treat the analysis as if you were a skeptical but constructive reviewer.
+
+**No Redundant Suggestions.**
+- Do not propose repeating analyses already performed unless:
+    - they failed,
+    - they were methodologically flawed, or
+    - you can clearly articulate how to improve them.
+
+**Context-Aware Critique.**
+- Explicitly take into account:
+    - what has already been tried,
+    - what worked,
+    - what did not,
+    - and what assumptions are now constrained by prior results.
+- For things that failed, state whether they are strictly neccesary or could be done in another way
+
+**Insight-Oriented Feedback.**
+- Focus on suggestions that could:
+    - strengthen causal interpretation,
+    - reduce uncertainty or bias,
+    - reveal new structure in the data,
+    - or test alternative explanations.
+- Avoid superficial “more data / more models” recommendations unless justified.
+
+**Big picture**
+- Your feedback must be used to improve the quality of the work but not to just make it overly complicated
+- We want to perform the minimum analysis needed to yield robust and sound conclusions and to have enough material for a paper
+- Ideally, if a method is simpler and yield the same results, the simpler should be used as will be more interpretable
+- Ultimately, we are interested in learning about science, not super technical details of the way to analyze the data
+
+**Forward-Looking.**
+- Your feedback should not only improve performance, but also help the project learn something new.
+
+Data description:
+# Data Description: Transition-Metal Dichalcogenides (TMDs) and Superconductivity
+
+## Overview
+This project analyzes structural and electronic properties of Transition-Metal Dichalcogenides (TMDs) sourced from the Materials Project. The goal is to identify patterns between crystal symmetry (space groups) and indicators of superconducting potential (such as density of states at the Fermi level and structural stability).
+
+## Data Source
+- **API**: Materials Project API (MPRester)
+- **Target Materials**: Compounds with the formula MX2, where M = Transition Metal (e.g., Mo, W, Nb, Ta, Ti, Zr) and X = Chalcogen (S, Se, Te).
+
+## File Inventory (to be generated via API)
+The pipeline will generate the following files in the project directory:
+- `/home/node/work/projects/materials_project_v1/tmd_data.csv`: A dataset containing:
+    - `material_id`: Unique MP ID.
+    - `formula`: Chemical formula.
+    - `spacegroup`: Crystal space group.
+    - `energy_above_hull`: Stability indicator (eV/atom).
+    - `band_gap`: Electronic band gap (eV).
+    - `dos_at_fermi`: Density of states at the Fermi level.
+    - `volume`: Unit cell volume.
+    - `lattice_parameters`: a, b, c, alpha, beta, gamma.
+
+## Variable Meanings
+- `energy_above_hull`: A value of 0 indicates a thermodynamically stable material.
+- `dos_at_fermi`: High DOS at the Fermi level is often a prerequisite for superconductivity according to BCS theory.
+- `spacegroup`: Defines the symmetry operations of the crystal, critical for identifying phase transitions.
+
+## Suggested Analyses
+1. **Symmetry Mapping**: Compare the distribution of `dos_at_fermi` across different space groups.
+2. **Stability vs. Gap**: Analyze the relationship between thermodynamic stability and band gap to identify potential metallic phases.
+3. **Compositional Trends**: Check if specific transition metals consistently produce high DOS in specific symmetries.
+
+
+Current idea: 
+**Title: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs**
+
+This research moves beyond simple DOS-thresholding by quantifying the "Electronic Overperformance" of transition metals within the MX2 structural landscape. We will execute a multivariate linear regression where `dos_at_fermi` is the dependent variable, modeled as a function of `volume`, `spacegroup` (via one-hot encoding), and `log1p(energy_above_hull)`. By calculating the positive residuals of this model, we isolate materials where the transition metal's electronic contribution significantly exceeds the expectations set by their structural geometry and thermodynamic stability. This approach identifies "electronic outliers"—materials that achieve high DOS not merely due to favorable symmetry or volume, but through intrinsic compositional properties that may foster enhanced electron-phonon coupling. By ranking candidates by these regression residuals, we provide a prioritized list of metallic candidates (`band_gap` = 0.0 eV) that possess the highest potential for superconductivity while remaining agnostic to the bias of structural prevalence. This methodology effectively decouples compositional excellence from structural geometry, offering a refined, physically grounded path for experimental target identification.
+
+Current research plan:
+1. **Data Preprocessing and Feature Engineering**: 
+   - Apply a `log1p` transformation to the `energy_above_hull` feature to mitigate right-skewness.
+   - Perform one-hot encoding on the `spacegroup` categorical variable.
+   - Create a binary feature `is_group_v` (1 if the transition metal is Nb or Ta, 0 otherwise) to explicitly account for known compositional drivers of high DOS.
+   - Apply Z-score normalization (StandardScaler) to all continuous features (`volume`, transformed `energy_above_hull`, and `dos_at_fermi`).
+
+2. **Multicollinearity and Model Selection**:
+   - Calculate the Variance Inflation Factor (VIF) for all predictors (`volume`, `spacegroup` dummies, `energy_above_hull`, `is_group_v`) to ensure no severe multicollinearity exists.
+   - Select a regularized regression model (Ridge or Lasso) to stabilize coefficients, ensuring the model remains robust even if minor correlations persist between structural features.
+
+3. **Cross-Validated Residual Calculation**:
+   - Implement a 5-fold cross-validation strategy to fit the regression model.
+   - For each fold, calculate the residuals (actual `dos_at_fermi` minus predicted `dos_at_fermi`) for the held-out test set. This ensures that the "expected" DOS is derived from a model that has not seen the specific data point, preventing overfitting.
+
+4. **Residual Normalization and Statistical Outlier Detection**:
+   - Compute the Studentized residuals for all observations to account for potential heteroscedasticity.
+   - Identify "statistically significant" electronic outliers by selecting materials where the Studentized residual exceeds a threshold (e.g., > 2.0 standard deviations).
+
+5. **Filtering for Metallic Candidates**:
+   - Filter the dataset to retain only materials where `band_gap == 0.0` eV.
+   - Cross-reference these metallic candidates with the calculated Studentized residuals to isolate materials that are both metallic and exhibit statistically significant "Electronic Overperformance."
+
+6. **Ranking and Prioritization**:
+   - Rank the filtered metallic candidates in descending order based on the magnitude of their Studentized residuals.
+   - Generate a final prioritized list of candidates that demonstrate the highest potential for enhanced electron-phonon coupling, effectively decoupling compositional excellence from structural geometry.
+
+7. **Visualization of Results**:
+   - Generate a parity plot comparing predicted vs. actual `dos_at_fermi`, explicitly highlighting the top 10 ranked candidates with distinct labels or colors.
+   - Create a scatter plot of `energy_above_hull` vs. `dos_at_fermi`, color-coded by the magnitude of the Studentized residuals, to visualize the decoupling of structural stability from electronic performance.
+
+8. **Final Synthesis**:
+   - Compile the final prioritized list including `material_id`, `formula`, `spacegroup`, and Studentized residual value.
+   - Document the findings by summarizing how the identified outliers deviate from the baseline trends established by the structural and compositional features, providing a physically grounded rationale for experimental validation.
+
+Current results:
+# Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs
+
+### 1. Dataset Composition and Data Quality
+
+The foundation of this research relies on a comprehensive dataset comprising 500 Transition-Metal Dichalcogenide (TMD) compounds with the general stoichiometric formula MX2. The dataset encompasses a diverse array of transition metals (M) paired with chalcogens (X = S, Se, Te). The structural diversity of the dataset is captured through the distribution of crystallographic space groups, which define the symmetry operations of the crystal lattices. The dataset includes five primary space groups: P-3m1 (117 samples), Pm-3m (101 samples), R3m (94 samples), Fm-3m (94 samples), and P6_3/mmc (94 samples). This relatively balanced distribution ensures that the subsequent statistical models are not unduly biased toward a single structural conformation, allowing for a generalized analysis of the MX2 landscape.
+
+The continuous features in the dataset provide a macroscopic view of the thermodynamic and electronic properties of these materials. The `energy_above_hull`, a critical indicator of thermodynamic stability, exhibits a mean of 0.096 eV/atom and a standard deviation of 0.095 eV/atom, with values ranging from a highly stable 0.0001 eV/atom to a metastable 0.480 eV/atom. To mitigate the inherent right-skewness of this thermodynamic metric and linearize its relationship with the target variables, a `log1p` transformation was applied. The electronic `band_gap` spans from 0.0 eV (indicative of metallic behavior) to 2.96 eV, with a mean of 0.786 eV. The primary target variable, the density of states at the Fermi level (`dos_at_fermi`), displays significant variance, with a mean of 2.449 states/eV and a maximum of 9.94 states/eV. Finally, the unit cell `volume` averages 50.69 Å³, ranging from 15.29 to 84.96 Å³.
+
+Data quality was rigorously maintained throughout the preprocessing phase. The dataset contained zero missing values across all critical columns, ensuring that no imputation artifacts were introduced into the target variable or primary predictors. To explicitly account for known compositional drivers of high DOS, a binary feature, `is_group_v`, was engineered to flag compounds containing Niobium (Nb) or Tantalum (Ta). Finally, all continuous predictors (`volume`, `energy_above_hull_log1p`, and `dos_at_fermi`) were standardized using Z-score normalization. This scaling is imperative for regularized regression techniques, ensuring that features with disparate magnitudes do not disproportionately influence the penalty term during model training.
+
+### 2. Multicollinearity Assessment and Model Performance
+
+Prior to model fitting, a rigorous multicollinearity assessment was conducted using the Variance Inflation Factor (VIF). Multicollinearity can severely destabilize the coefficients of a linear regression model, rendering the interpretation of residuals unreliable. The initial VIF calculation revealed infinite values for the one-hot encoded space group variables (`sg_Fm-3m`, `sg_Pm-3m`, `sg_P6_3/mmc`, `sg_P-3m1`, `sg_R3m`). This is a classic manifestation of the "dummy variable trap," where the sum of the mutually exclusive categorical indicators perfectly predicts the intercept, leading to a singular design matrix. To resolve this perfect collinearity, the `sg_Fm-3m` feature was dropped, serving as the baseline reference state for the model. Following this adjustment, the remaining predictors exhibited VIF values well below the conservative threshold of 10. Specifically, `energy_above_hull_log1p` yielded a VIF of 1.016, `volume` a VIF of 1.009, and `is_group_v` a VIF of 1.007. This confirmed that the refined feature space was free of pathological collinearity, allowing for stable coefficient estimation.
+
+With a stable feature space established, a Ridge regression model (L2 regularization) was deployed to predict the scaled `dos_at_fermi`. Ridge regression was selected to further guard against any latent residual collinearity and to prevent overfitting. The model was trained using a 5-fold cross-validation strategy, optimizing the regularization parameter (α) over a logarithmic grid. The cross-validation procedure identified an optimal α of 1000.0. 
+
+The performance metrics of the cross-validated model are highly revealing. The R-squared scores across the five folds were consistently negative or near zero: [-0.0218, -0.0065, -0.0114, -0.0408, -0.1407], culminating in a mean cross-validation R-squared of -0.0442. In a conventional predictive modeling context, an R-squared below zero indicates that the model performs worse than a simple horizontal line representing the mean of the target variable. However, within the specific methodological framework of this research, this "poor" performance is both expected and highly informative. It quantitatively demonstrates that the macroscopic structural features (volume, space group symmetry) and thermodynamic stability (`energy_above_hull`) are fundamentally insufficient to explain the variance in the density of states at the Fermi level. The electronic structure of these TMDs is not merely a byproduct of their geometric arrangement or stability; rather, it is driven by intrinsic, localized compositional factors. Because the baseline structural model fails to capture this variance, the resulting residuals effectively isolate the purely compositional contributions to the DOS, setting the stage for robust outlier detection.
+
+### 3. Residual Distribution and Outlier Identification
+
+To quantify the "Electronic Overperformance" of the materials, we analyzed the residuals from the cross-validated Ridge regression. To account for potential heteroscedasticity and the varying leverage of different data points in the feature space, the raw residuals were converted into Studentized residuals. The Studentized residuals for the entire dataset exhibited a mean of -0.00077 and a standard deviation of 1.001, perfectly aligning with the expected standard normal distribution properties. The residuals spanned from a minimum of -0.849 to a maximum of 2.338.
+
+Because superconductivity in the Bardeen-Cooper-Schrieffer (BCS) regime requires a metallic ground state, the dataset was subsequently filtered to retain only materials with a `band_gap` of 0.0 eV. This filtering isolated 246 metallic candidates. Within this metallic subset, the distribution of Studentized residuals shifted significantly upward, exhibiting a mean of 0.794. This positive shift indicates that metallic TMDs, on average, possess a higher DOS at the Fermi level than the global structural baseline would predict.
+
+To identify the true "electronic outliers"—materials that exhibit statistically significant electronic overperformance—we applied a stringent threshold, selecting only those metallic candidates with a Studentized residual greater than 2.0 standard deviations. This threshold isolates the upper tail of the distribution, ensuring that the selected materials are not merely marginally better than average, but represent distinct anomalies in the structural-electronic landscape. This filtering process yielded a highly refined list of 31 prioritized candidates. The residuals within this elite cohort ranged from 2.006 to 2.338, with a mean of 2.202. By isolating these specific materials, we successfully decoupled compositional excellence from structural geometry, providing a mathematically rigorous and physically grounded set of targets for experimental validation.
+
+### 4. The Prioritized Candidate List with Physical Rationale
+
+The culmination of the residual-based filtering is a prioritized list of 31 metallic TMDs, ranked by the magnitude of their Studentized residuals. The top 10 candidates from this list represent the most extreme cases of electronic overperformance: MnS2 (residual: 2.338), VS2 (2.334), AgS2 (2.329), IrTe2 (2.318), LuSe2 (2.314), CuS2 (2.309), MoSe2 (2.305), TaTe2 (2.302), ReSe2 (2.300), and FeS2 (2.287). 
+
+The physical rationale behind the emergence of these specific compounds is deeply rooted in their electronic band structures and orbital hybridizations. According to BCS theory, the superconducting transition temperature (Tc) is exponentially dependent on the density of states at the Fermi level (N(EF)) and the strength of the electron-phonon coupling potential. Therefore, maximizing N(EF) is a primary strategy for discovering new superconductors. However, simply screening for high DOS can yield false positives—materials where the high DOS is a fragile artifact of a specific, easily distorted crystal lattice. By isolating materials with high Studentized residuals, we identify compounds where the high N(EF) is driven by the intrinsic nature of the M-X bonds.
+
+The presence of TaTe2 (Tantalum Ditelluride) in the top echelon is particularly validating for our methodology. Group V transition metals, such as Tantalum (Ta) and Niobium (Nb), possess a d¹ electron configuration in the MX2 stoichiometry. This configuration typically results in a half-filled d-band that crosses the Fermi level, leading to an inherently high density of states. This high DOS is a well-documented prerequisite for strong electron-phonon coupling, making Group V TMDs classic candidates for charge density wave (CDW) phases and superconductivity. The inclusion of the `is_group_v` feature in our model was a deliberate choice to see if the regression would absorb the variance associated with Nb and Ta. The fact that TaTe2 still emerged as an outlier (residual: 2.302) despite the model having access to the `is_group_v` predictor indicates that TaTe2's electronic overperformance is exceptional even relative to other Group V materials.
+
+Furthermore, the appearance of compounds like VS2 (Vanadium Disulfide) and MoSe2 (Molybdenum Diselenide) highlights the nuanced interplay between transition metal d-orbitals and chalcogen p-orbitals. Vanadium exhibits strong electronic correlations that can lead to enhanced DOS at the Fermi level, often competing with magnetic ground states. Molybdenum typically forms semiconducting phases; however, in specific polymorphic forms or under certain thermodynamic conditions, it can exhibit metallic behavior with a sharply peaked DOS due to the specific splitting of the d-orbitals in the crystal field. 
+
+The inclusion of late transition metals like AgS2, CuS2, and IrTe2 suggests that strong covalent mixing between the extended d-orbitals of the heavy metals and the chalcogen p-orbitals can also result in anomalous electronic accumulation at the Fermi level. IrTe2, for instance, is known experimentally to undergo complex structural and electronic phase transitions, often hosting superconducting states upon doping or intercalation. By ranking these candidates based on their deviation from structural expectations, we provide a prioritized roadmap for experimentalists. These materials achieve their high DOS not because they happen to crystallize in a favorable volume or symmetry, but because their intrinsic elemental composition drives an anomalous electronic response, maximizing the potential for the formation of Cooper pairs.
+
+### 5. Interpretation of the Visualization Results
+
+The quantitative findings are powerfully corroborated by the visual analysis of the model's outputs, which are encapsulated in a dual-panel figure. 
+
+The first visualization, a Parity Plot comparing the predicted DOS at the Fermi level against the actual DOS, starkly illustrates the limitations of the structural baseline model and the magnitude of the outliers. In this plot, the bulk of the predictions are tightly clustered near zero on the x-axis (Predicted DOS), while the actual DOS values (y-axis) exhibit a massive spread, ranging from -0.7684 to 2.3512 (scaled). The diagonal reference line (y = x), which represents perfect prediction, is largely unpopulated. The top 10 prioritized candidates are explicitly highlighted in red and annotated with their chemical formulas. These points are located far above the parity line, visually confirming that their actual DOS vastly exceeds the model's predictions. For example, MnS2 has a predicted scaled DOS of -0.0249 but an actual scaled DOS of 2.3297. The vertical distance from the parity line to these red points represents the Studentized residual—the core metric of our study. This plot visually cements the conclusion that structural and thermodynamic features are blind to the compositional mechanisms driving high DOS, and that our top candidates are true electronic anomalies.
+
+The second visualization is a scatter plot mapping the raw `energy_above_hull` (x-axis, ranging from 0.0001 to 0.4797 eV/atom) against the scaled `dos_at_fermi` (y-axis), with the data points color-coded by their Studentized residual (ranging from -0.8493 to 2.3384). This plot is crucial for understanding the relationship between thermodynamic stability and electronic overperformance. In conventional materials discovery, there is often a strict bias toward highly stable materials (energy above hull ≈ 0). However, the scatter plot reveals that high DOS values, and correspondingly high Studentized residuals (indicated by the bright yellow/green hues), are distributed across the entire spectrum of thermodynamic stability. 
+
+For instance, while some top candidates like TaTe2 (0.0012 eV/atom) and CuS2 (0.0060 eV/atom) are highly stable and reside on or very near the convex hull, others like FeS2 (0.4396 eV/atom) and IrTe2 (0.2007 eV/atom) exist in highly metastable regimes. The color gradient clearly shows that the "electronic overperformance" is decoupled from the `energy_above_hull`. This is a profound finding: it suggests that the search for superconducting TMDs should not be strictly confined to the thermodynamic convex hull. Metastable phases, which might be accessible via non-equilibrium synthesis techniques such as molecular beam epitaxy, rapid quenching, or high-pressure synthesis, can harbor exceptional electronic properties that are entirely missed by traditional stability-first screening approaches. The residual-based methodology, as visualized here, successfully navigates this complex landscape, identifying the most promising electronic candidates regardless of their position on the thermodynamic stability curve.
+
+Report with previous results:
+
+
+**Respond in exactly this format:**
+
+\\begin{FEEDBACK}
+<FEEDBACK>
+\\end{FEEDBACK}
+
+In <FEEDBACK>, put your evaluation.
+
+###### PROMPT ENDS ########
+
+\begin{REPORT}
+# Summary: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs
+
+### 1. Methodology & Assumptions
+*   **Objective**: Identify metallic MX2 TMDs with "Electronic Overperformance" (high `dos_at_fermi` relative to structural/thermodynamic baseline).
+*\begin{FEEDBACK}
+The current analysis successfully identifies "electronic outliers" by isolating   **Model**: Ridge regression (α=1000) predicting `dos_at_fermi` using\begin{COMMENTS}
+The dataset description contains a constraint that directly impacts the validity residuals from a structural baseline model. However, the scientific robustness of the conclusions is undermined by several critical oversights that must `volume`, `log1p(energy_above_hull)`, `is_group_v` (Nb/Ta flag), and one-hot encoded `spacegroup` (baseline: `Fm-3m`).
+*   **Validation**: 5-fold cross-validation; Studentized residuals used to quantify deviation from structural expectations.
+*   **Filtering**: Metallic candidates (`band_gap of the reported results: the inclusion of materials with high `energy_above_hull` values (up to 0.48 be addressed to move from statistical correlation to physical insight.
+
+**1. Critical Weakness: The "Metallic" Fall` = 0.0 eV) with Studentized residuals > 2.0 SD.
+
+### 2. Key Findings
+*   **0 eV/atom). 
+
+The research plan and analysis identify several "top candidates" (e.g., FeS2, IrModel Performance**: Mean CV R² = -0.0442. The structural baseline is insufficient to explain `dos_Te2) that are significantly metastable. However, the dataset description defines `energy_above_hull` = 0 as theacy**
+The analysis filters for `band_gap == 0.0` eV to identify superconductors. In Materialsat_fermi` variance, confirming that electronic properties are driven by intrinsic compositional factors rather than geometry.
+*   **Out indicator for thermodynamic stability. By including highly metastable materials in the final prioritized list without a constraint or filter for synthesizability, the analysis identifieslier Identification**: 31 metallic candidates identified as significant electronic outliers.
+*   **Top Candidates**: MnS2, VS Project data, a band gap of 0.0 eV is often a computational artifact of the PBE functional (which systematically underestimates gaps) or a result of semi-metallic behavior that does not support superconductivity. 
+*   **Action2, AgS2, IrTe2, LuSe2, CuS2, MoSe2, TaTe2, ReSe theoretical electronic outliers that may be physically impossible to realize experimentally. Consequently, the conclusions regarding these materials as "targets for experimental validation" are affected2, FeS2.
+*   **Stability Decoupling**: High-residual candidates exist across the entire :** You must validate the "metallicity" of the top 10 candidates by checking the electronic band structure plots or the, as the dataset lacks the necessary information (e.g., phonon dispersion calculations or synthesis feasibility metrics) to distinguish between`energy_above_hull` spectrum, indicating that metastable phases (e.g., FeS2, IrTe2 Fermi surface topology (if available). A simple `band_gap == 0` filter is insufficient to guarantee a metallic metastable phases that are experimentally accessible and those that are dynamically unstable.
+\end{COMMENTS}
+
+) are viable targets for non-equilibrium synthesis.
+
+### 3. Limitations & Uncertainties
+*   **Model ground state.
+
+**2. Methodological Gap: The "Group V" Bias**
+You included `is_group_v Bias**: The model assumes a linear relationship between structural features and DOS; non-linear electronic correlations (e.g., strong` as a feature to "account for" compositional drivers. By doing so, you have effectively penalized the model for being a Group V material. If a Group V material still appears as an outlier, it is indeed interesting, but you have potentially electron-electron interactions in Vanadium compounds) are captured only as residuals.
+*   **Data Scope**: Limited to MX2 stoichiometry; results may not generalize to other TMD phases or intercalated structures.
+*   **Synthesis Feasibility**: High masked other equally important compositional drivers (e.g., d-electron count, electronegativity of the chalcogen) by lumping them into a binary flag.
+*   **Action:** Re-run the model *without* the `is residuals in metastable materials suggest potential for superconductivity, but experimental accessibility remains unverified.
+
+### 4. Future Directions_group_v` feature. Compare the residuals. If the same candidates emerge, their "overperformance" is truly
+*   **Experimental Validation**: Prioritize synthesis of the top 10 candidates using non-equilibrium methods (e.g., MBE, high-pressure) for metastable phases.
+*   **Refinement**: Incorporate additional features robust. If they disappear, your current results are merely highlighting the trivial fact that Group V metals have high DOS.
+
+**3. Miss (e.g., electronegativity, d-orbital occupancy, or spin-orbit coupling strength) to further reduce baselineed Opportunity: The Stability-Performance Trade-off**
+You highlight that high-residual materials exist far from the convex hull ( variance.
+*   **Mechanism Analysis**: Perform DFT-based band structure calculations on the top 31 candidates to confirm the physical origin of the anomalous DOS peaks.
+\end{REPORT}
+
+e.g., FeS2). While you suggest these are targets for non-equilibrium synthesis, you ignore the "synthesizability" constraint. A material with a high residual but an `energy_above_hull` of 0.4 eV is likely a computational artifact or a highly unstable phase that will never exist in a lab.
+*   **Action:** Introduce a "Synthesizability Filter." Cross-reference your top candidates with the `icsd_ids` or `theoretical` flag in the Materials Project. If a candidate has no experimental record and a high `energy_above_hull`, it is likely a false positive.
+
+**4. Statistical Overclaim: Studentized Residuals**
+You interpret the Studentized residuals as a measure of "compositional excellence." However, these residuals are simply the variance not explained by volume and space group. This could easily be capturing "noise" or "computational errors" in the DFT calculations for specific materials.
+*   **Action:** Perform a sensitivity analysis. Check if the top 10 candidates share commonalities in their `lattice_parameters` or `M-X` bond lengths that the model failed to capture. If the residuals are driven by a specific structural motif (e.g., octahedral distortion) not captured by space group alone, the "compositional" claim is weakened.
+
+**5. Forward-Looking Recommendation**
+To strengthen the causal interpretation, move beyond the linear regression. The relationship between DOS and structural parameters is non-linear. 
+*   **Action:** In the next iteration, replace the linear model with a Random Forest or Gradient Boosting regressor. Use SHAP (SHapley Additive exPlanations) values to determine which features (volume, symmetry, or specific element properties) are actually driving the DOS. This will provide a more physically grounded explanation for why these specific candidates are outliers, rather than just labeling them as such.
+\end{FEEDBACK}
+
+
+###### PROMPT BEGINS ########
+Human: You are given three inputs:
+1) a dataset description,
+2) the current idea of a project,
+3) a report outlinig the results obtained from previous ideas and methods on the same dataset. 
+
+Your task is to undertand in detail the report, the things tried, and which one worked and which ones didnt work so well. 
+With that information, formulate an idea/hypothesis to carry out with the same dataset that will help understand an aspect of the problem better and can led to better performance on the results. 
+The idea/hypothesis needs to be something new and different to what has been done already.
+Note that your idea/hypothesis will be passed to a set of agents that will make a research plan with it, and that plan will be sent to another agents for writing and executing code.
+Note that your idea/hypothesis need to adhere to the constraints of the dataset. I.e. new data is not available.
+
+Data description:
+# Data Description: Transition-Metal Dichalcogenides (TMDs) and Superconductivity
+
+## Overview
+This project analyzes structural and electronic properties of Transition-Metal Dichalcogenides (TMDs) sourced from the Materials Project. The goal is to identify patterns between crystal symmetry (space groups) and indicators of superconducting potential (such as density of states at the Fermi level and structural stability).
+
+## Data Source
+- **API**: Materials Project API (MPRester)
+- **Target Materials**: Compounds with the formula MX2, where M = Transition Metal (e.g., Mo, W, Nb, Ta, Ti, Zr) and X = Chalcogen (S, Se, Te).
+
+## File Inventory (to be generated via API)
+The pipeline will generate the following files in the project directory:
+- `/home/node/work/projects/materials_project_v1/tmd_data.csv`: A dataset containing:
+    - `material_id`: Unique MP ID.
+    - `formula`: Chemical formula.
+    - `spacegroup`: Crystal space group.
+    - `energy_above_hull`: Stability indicator (eV/atom).
+    - `band_gap`: Electronic band gap (eV).
+    - `dos_at_fermi`: Density of states at the Fermi level.
+    - `volume`: Unit cell volume.
+    - `lattice_parameters`: a, b, c, alpha, beta, gamma.
+
+## Variable Meanings
+- `energy_above_hull`: A value of 0 indicates a thermodynamically stable material.
+- `dos_at_fermi`: High DOS at the Fermi level is often a prerequisite for superconductivity according to BCS theory.
+- `spacegroup`: Defines the symmetry operations of the crystal, critical for identifying phase transitions.
+
+## Suggested Analyses
+1. **Symmetry Mapping**: Compare the distribution of `dos_at_fermi` across different space groups.
+2. **Stability vs. Gap**: Analyze the relationship between thermodynamic stability and band gap to identify potential metallic phases.
+3. **Compositional Trends**: Check if specific transition metals consistently produce high DOS in specific symmetries.
+
+
+Current idea: 
+**Title: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs**
+
+This research moves beyond simple DOS-thresholding by quantifying the "Electronic Overperformance" of transition metals within the MX2 structural landscape. We will execute a multivariate linear regression where `dos_at_fermi` is the dependent variable, modeled as a function of `volume`, `spacegroup` (via one-hot encoding), and `log1p(energy_above_hull)`. By calculating the positive residuals of this model, we isolate materials where the transition metal's electronic contribution significantly exceeds the expectations set by their structural geometry and thermodynamic stability. This approach identifies "electronic outliers"—materials that achieve high DOS not merely due to favorable symmetry or volume, but through intrinsic compositional properties that may foster enhanced electron-phonon coupling. By ranking candidates by these regression residuals, we provide a prioritized list of metallic candidates (`band_gap` = 0.0 eV) that possess the highest potential for superconductivity while remaining agnostic to the bias of structural prevalence. This methodology effectively decouples compositional excellence from structural geometry, offering a refined, physically grounded path for experimental target identification.
+
+Report with previous results:
+
+
+Iteration 0:
+# Summary: Residual-Based Identification of Anomalous Electronic Coupling in MX2 TMDs
+
+### 1. Methodology & Assumptions
+*   **Objective**: Identify metallic MX2 TMDs with "Electronic Overperformance" (high `dos_at_fermi` relative to structural/thermodynamic baseline).
+*   **Model**: Ridge regression (α=1000) predicting `dos_at_fermi` using `volume`, `log1p(energy_above_hull)`, `is_group_v` (Nb/Ta flag), and one-hot encoded `spacegroup` (baseline: `Fm-3m`).
+*   **Validation**: 5-fold cross-validation; Studentized residuals used to quantify deviation from structural expectations.
+*   **Filtering**: Metallic candidates (`band_gap` = 0.0 eV) with Studentized residuals > 2.0 SD.
+
+### 2. Key Findings
+*   **Model Performance**: Mean CV R² = -0.0442. The structural baseline is insufficient to explain `dos_at_fermi` variance, confirming that electronic properties are driven by intrinsic compositional factors rather than geometry.
+*   **Outlier Identification**: 31 metallic candidates identified as significant electronic outliers.
+*   **Top Candidates**: MnS2, VS2, AgS2, IrTe2, LuSe2, CuS2, MoSe2, TaTe2, ReSe2, FeS2.
+*   **Stability Decoupling**: High-residual candidates exist across the entire `energy_above_hull` spectrum, indicating that metastable phases (e.g., FeS2, IrTe2) are viable targets for non-equilibrium synthesis.
+
+### 3. Limitations & Uncertainties
+*   **Model Bias**: The model assumes a linear relationship between structural features and DOS; non-linear electronic correlations (e.g., strong electron-electron interactions in Vanadium compounds) are captured only as residuals.
+*   **Data Scope**: Limited to MX2 stoichiometry; results may not generalize to other TMD phases or intercalated structures.
+*   **Synthesis Feasibility**: High residuals in metastable materials suggest potential for superconductivity, but experimental accessibility remains unverified.
+
+### 4. Future Directions
+*   **Experimental Validation**: Prioritize synthesis of the top 10 candidates using non-equilibrium methods (e.g., MBE, high-pressure) for metastable phases.
+*   **Refinement**: Incorporate additional features (e.g., electronegativity, d-orbital occupancy, or spin-orbit coupling strength) to further reduce baseline variance.
+*   **Mechanism Analysis**: Perform DFT-based band structure calculations on the top 31 candidates to confirm the physical origin of the anomalous DOS peaks.
+        
+
+**Respond in exactly this format:**
+
+\\begin{HYPOTHESIS}
+<HYPOTHESIS>
+\\end{HYPOTHESIS}
+
+In <HYPOTHESIS>, put idea/hypothesis.
+
+
+###### PROMPT ENDS ########
+
+\begin{HYPOTHESIS}
+The failure of the linear regression model (R² ≈ 0) suggests that `dos_at_fermi` is governed by non-linear, discrete quantum mechanical interactions rather than continuous structural parameters. I hypothesize that the "Electronic Overperformance" identified in previous iterations is not a random residual, but a signature of specific "Symmetry-Composition Clusters" where the interaction between the transition metal's d-orbital occupancy and the crystal's point group symmetry creates localized electronic states. Instead of linear regression, I propose using an Unsupervised Manifold Learning approach (specifically t-SNE or UMAP) to project the high-dimensional feature space (including lattice parameters, space group, and elemental properties like electronegativity/atomic number) into a 2D latent space. By clustering these materials, we can identify "islands" of high-DOS density that are structurally distinct. We will then calculate the "Local Density of States Enhancement" (LDSE) factor—the ratio of a material's `dos_at_fermi` to the centroid mean of its respective cluster. Materials that exhibit high LDSE within clusters that are otherwise dominated by low-DOS materials represent "symmetry-protected electronic anomalies." This method will identify candidates that are not just outliers, but represent unique, optimized electronic configurations within their specific structural family, providing a more robust physical basis for superconductivity than simple residual analysis.
+\end{HYPOTHESIS}
+
