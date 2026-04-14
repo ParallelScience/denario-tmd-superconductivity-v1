@@ -1,0 +1,9 @@
+The previous iterations established that `dos_at_fermi` is largely decoupled from macroscopic structural parameters, resulting in poor predictive R-squared values. This suggests that the "anomalous" electronic states are likely driven by local symmetry breaking or specific orbital hybridization patterns that are not captured by global lattice parameters or space groups alone. 
+
+**Hypothesis**: The "Electronic Overperformance" (high residuals) is not random noise but is correlated with the **anisotropy of the unit cell** and the **local coordination environment** of the transition metal. Specifically, I hypothesize that the ratio of the lattice parameters (e.g., $c/a$ for hexagonal/trigonal systems) and the deviation of the unit cell from an ideal cubic/orthorhombic symmetry act as a "geometric constraint" on the d-orbital splitting. 
+
+**Proposed Methodology**: Instead of a global regression, we will perform a **Clustering-based Residual Analysis**. 
+1. Use unsupervised learning (e.g., K-Means or DBSCAN) to group materials into "Structural Families" based on their lattice parameters and space group symmetry. 
+2. Within each cluster, calculate the local mean of `dos_at_fermi`. 
+3. Identify candidates that exhibit high `dos_at_fermi` relative to their *cluster-specific* mean rather than the global dataset mean. 
+4. This approach accounts for the fact that different crystal systems (e.g., 2H vs 1T phases) have inherently different electronic baselines. By normalizing against the structural family, we can isolate materials that are "anomalous within their own symmetry class," which is a more physically meaningful metric for identifying potential superconductors than a global regression that fails to account for fundamental symmetry-driven differences in electronic structure.
